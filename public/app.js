@@ -254,7 +254,7 @@ async function telaForm(id) {
 
   const renderEntregas = () => {
     document.getElementById('entregas').innerHTML = st.entregas.map((e, i) => `
-      <div class="bloco" data-i="${i}">
+      <div class="bloco entrega" data-i="${i}">
         <div class="campo"><label for="e-rede-${i}">Rede</label><select id="e-rede-${i}" data-k="rede">${opts(REDES, e.rede)}</select></div>
         <div class="campo"><label for="e-form-${i}">Formato</label><select id="e-form-${i}" data-k="formato">${opts(FORMATOS, e.formato)}</select></div>
         <div class="campo"><label for="e-qtd-${i}">Quantidade</label><input id="e-qtd-${i}" data-k="quantidade" type="number" min="1" value="${e.quantidade}"></div>
@@ -469,7 +469,7 @@ async function telaDetalhe(id) {
           ${p.parcelas.map((x) => {
             const atrasada = !x.pago_em && x.vencimento < hj;
             return `<div class="lista-item" style="justify-content:space-between">
-              <div class="meio"><div class="titulo">${x.numero}/${p.parcelas.length} · <span class="num">${brl(x.valor)}</span></div>
+              <div class="meio"><div class="titulo" style="white-space:nowrap">${x.numero}/${p.parcelas.length} · <span class="num">${brl(x.valor)}</span></div>
                 <div class="det" style="color:${atrasada ? 'var(--vermelho)' : ''}">${x.pago_em ? 'Pago em ' + dataBR(x.pago_em) : (atrasada ? 'Venceu em ' : 'Vence ') + dataBR(x.vencimento)}${p.forma_pagamento ? ' · ' + esc(p.forma_pagamento) : ''}</div></div>
               <button type="button" class="btn pequeno" data-parcela="${x.id}" data-pago="${x.pago_em ? '1' : ''}" style="${x.pago_em ? 'background:var(--verde-bg);color:var(--verde);border-color:#BFDCCB' : 'color:var(--rosa-escuro)'}">${x.pago_em ? 'Pago ✓' : 'Marcar como pago'}</button>
             </div>`;
