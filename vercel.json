@@ -1,6 +1,7 @@
 {
   "outputDirectory": "public",
   "regions": ["gru1"],
+  "rewrites": [{ "source": "/portfolio", "destination": "/index.html" }],
   "headers": [
     {
       "source": "/(.*)",
