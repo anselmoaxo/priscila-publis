@@ -20,7 +20,7 @@ export default rota(async ({ req, res, body }) => {
     const [{ n }] = await sql`SELECT count(*)::int AS n FROM usuarios`;
     const sessao = await lerSessao(req);
     if (!sessao) return { logado: false, precisaCadastro: n === 0 };
-    const [u] = await sql`SELECT id, nome, email FROM usuarios WHERE id = ${sessao.uid}`;
+    const [u] = await sql`SELECT id, nome, email, foto, instagram, tiktok, whatsapp FROM usuarios WHERE id = ${sessao.uid}`;
     if (!u) { encerrarSessao(res); return { logado: false, precisaCadastro: n === 0 }; }
     return { logado: true, usuario: u };
   }
@@ -69,6 +69,28 @@ export default rota(async ({ req, res, body }) => {
     if (nova.length < 8) throw erro(400, 'A nova senha precisa ter pelo menos 8 caracteres.');
     await sql`UPDATE usuarios SET senha_hash = ${await bcrypt.hash(nova, 10)} WHERE id = ${u.id}`;
     return { ok: true };
+  }
+
+  if (acao === 'perfil') {
+    const sessao = await lerSessao(req);
+    if (!sessao) throw erro(401, 'Faça login para continuar.');
+    const nome = texto(body.nome, 100) || '';
+    const email = (texto(body.email, 200) || '').toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(email)) throw erro(400, 'Informe um e-mail válido.');
+    const arroba = (v) => { const s = texto(v, 60); return s ? s.replace(/^@+/, '').replace(/[^\w.]/g, '') || null : null; };
+    let foto = body.foto ?? null;
+    if (foto !== null) {
+      foto = String(foto);
+      if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(foto)) throw erro(400, 'Formato de foto inválido.');
+      if (foto.length > 400000) throw erro(400, 'A foto ficou grande demais. Tente outra imagem.');
+    }
+    const [dup] = await sql`SELECT 1 FROM usuarios WHERE email = ${email} AND id <> ${sessao.uid}`;
+    if (dup) throw erro(400, 'Esse e-mail já está em uso.');
+    const [u] = await sql`UPDATE usuarios SET nome = ${nome}, email = ${email}, foto = ${foto},
+        instagram = ${arroba(body.instagram)}, tiktok = ${arroba(body.tiktok)}, whatsapp = ${texto(body.whatsapp, 30)}
+      WHERE id = ${sessao.uid}
+      RETURNING id, nome, email, foto, instagram, tiktok, whatsapp`;
+    return { ok: true, usuario: u };
   }
 
   throw erro(400, 'Ação inválida.');

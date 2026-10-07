@@ -138,3 +138,12 @@ td a:hover { color: var(--rosa-escuro); }
 
 .carregando { padding: 64px; text-align: center; color: var(--cinza); }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--tinta); color: #fff; padding: 12px 20px; border-radius: 999px; font-weight: 500; z-index: 50; box-shadow: 0 8px 30px rgba(0,0,0,.2); }
+
+/* Perfil */
+.avatar { border-radius: 999px; object-fit: cover; flex-shrink: 0; display: inline-block; background: var(--rosa-claro); }
+.avatar-vazio { display: inline-flex; align-items: center; justify-content: center; background: var(--rosa); color: #fff; font-family: var(--display); font-weight: 700; letter-spacing: .5px; }
+.menu .perfil-link { display: inline-flex; align-items: center; gap: 8px; padding: 4px 14px 4px 4px; }
+.menu .perfil-link.ativo { background: var(--rosa-claro); color: var(--rosa-escuro); }
+.perfil-topo { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--rosa-linha); }
+#foto-preview .avatar { box-shadow: 0 0 0 4px #fff, 0 0 0 6px var(--rosa-borda); }
+label.btn { cursor: pointer; }

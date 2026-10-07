@@ -65,6 +65,14 @@ function toast(msg) {
 const ICON_MAIS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 const ICON_LIXO = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
 
+function avatar(u, tam = 40) {
+  const nome = (u?.nome || u?.email || '?').trim();
+  const iniciais = nome.split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+  return u?.foto
+    ? `<img class="avatar" src="${esc(u.foto)}" alt="" width="${tam}" height="${tam}" style="width:${tam}px;height:${tam}px">`
+    : `<span class="avatar avatar-vazio" aria-hidden="true" style="width:${tam}px;height:${tam}px;font-size:${Math.round(tam * 0.38)}px">${esc(iniciais)}</span>`;
+}
+
 function topo(ativo) {
   const item = (href, id, label) => `<a href="${href}" class="${ativo === id ? 'ativo' : ''}">${label}</a>`;
   return `<header class="topo">
@@ -73,8 +81,8 @@ function topo(ativo) {
       ${item('#/painel', 'painel', 'Painel')}
       ${item('#/publis', 'publis', 'Publis')}
       ${item('#/financeiro', 'financeiro', 'Contas a receber')}
-      ${item('#/conta', 'conta', 'Minha conta')}
       <button type="button" id="sair">Sair</button>
+      <a href="#/conta" class="perfil-link${ativo === 'conta' ? ' ativo' : ''}" aria-label="Meu perfil">${avatar(usuario, 36)}<span>${esc((usuario?.nome || 'Meu perfil').split(' ')[0])}</span></a>
     </nav>
   </header>`;
 }
@@ -128,8 +136,8 @@ async function telaLogin() {
         nome: document.getElementById('nome')?.value,
         lembrar: document.getElementById('lembrar')?.checked,
       };
-      const r = await api('auth', { method: 'POST', body });
-      usuario = r.usuario;
+      await api('auth', { method: 'POST', body });
+      usuario = null;
       location.hash = '#/painel';
     } catch (e) {
       msg.innerHTML = `<div class="alerta" role="alert">${esc(e.message)}</div>`;
@@ -165,7 +173,7 @@ async function telaPainel() {
 
   montar('painel', `
     <div class="cabeca">
-      <div><div class="sub">${MESES_LONGOS[agora.getMonth()]} de ${agora.getFullYear()}</div><h1>Oi${primeiroNome ? ', ' + esc(primeiroNome) : ''}</h1></div>
+      <div style="display:flex;align-items:center;gap:16px">${avatar(usuario, 64)}<div><div class="sub">${MESES_LONGOS[agora.getMonth()]} de ${agora.getFullYear()}</div><h1>Oi${primeiroNome ? ', ' + esc(primeiroNome) : ''}</h1></div></div>
       <a class="btn primario" href="#/publis/nova">${ICON_MAIS} Nova publi</a>
     </div>
     <div class="kpis">
@@ -608,19 +616,103 @@ async function telaFinanceiro() {
 }
 
 // ---------- conta ----------
+function redimensionarFoto(arquivo, lado = 400) {
+  return new Promise((ok, falha) => {
+    if (!arquivo.type.startsWith('image/')) return falha(new Error('Escolha um arquivo de imagem.'));
+    const url = URL.createObjectURL(arquivo);
+    const img = new Image();
+    img.onload = () => {
+      const m = Math.min(img.width, img.height);
+      const c = document.createElement('canvas');
+      c.width = c.height = Math.min(lado, m);
+      c.getContext('2d').drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      ok(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); falha(new Error('Não consegui abrir essa imagem. Tente JPG ou PNG.')); };
+    img.src = url;
+  });
+}
+
 function telaConta() {
+  const u = usuario || {};
+  let foto = u.foto || null;
   montar('conta', `
-    <h1>Minha conta</h1>
-    <section class="caixa" style="max-width:480px">
-      <div><div class="rot">E-mail de acesso</div><div class="muted">${esc(usuario?.email)}</div></div>
-      <form id="form-senha" style="display:flex;flex-direction:column;gap:14px" novalidate>
-        <h2>Alterar senha</h2>
-        <div id="msg"></div>
-        <div class="campo"><label for="atual">Senha atual</label><input id="atual" type="password" autocomplete="current-password"></div>
-        <div class="campo"><label for="nova">Nova senha</label><input id="nova" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></div>
-        <button type="submit" class="btn primario" style="align-self:flex-start">Salvar nova senha</button>
-      </form>
-    </section>`, true);
+    <h1>Meu perfil</h1>
+    <form id="form-perfil" class="caixa" novalidate style="gap:24px">
+      <div class="perfil-topo">
+        <div id="foto-preview">${avatar({ ...u, foto }, 120)}</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div><div style="font-family:var(--display);font-size:24px;font-weight:700" id="nome-preview">${esc(u.nome || 'Seu nome')}</div>
+            <div class="muted">${esc(u.email)}</div></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <label class="btn pequeno" for="foto-arquivo" style="color:var(--rosa-escuro)">${foto ? 'Trocar foto' : 'Adicionar foto'}</label>
+            <input id="foto-arquivo" type="file" accept="image/*" class="hidden">
+            <button type="button" class="btn pequeno perigo${foto ? '' : ' hidden'}" id="foto-remover">Remover foto</button>
+          </div>
+          <div class="muted" style="font-size:13px">JPG ou PNG. A foto é cortada em quadrado automaticamente.</div>
+        </div>
+      </div>
+      <div id="msg-perfil"></div>
+      <div class="grade">
+        <div class="campo"><label for="p-nome">Nome</label><input id="p-nome" autocomplete="name" value="${esc(u.nome)}"></div>
+        <div class="campo"><label for="p-email">E-mail de acesso</label><input id="p-email" type="email" autocomplete="email" value="${esc(u.email)}"></div>
+        <div class="campo"><label for="p-insta">Instagram</label><input id="p-insta" placeholder="@seuperfil" value="${u.instagram ? '@' + esc(u.instagram) : ''}"></div>
+        <div class="campo"><label for="p-tiktok">TikTok</label><input id="p-tiktok" placeholder="@seuperfil" value="${u.tiktok ? '@' + esc(u.tiktok) : ''}"></div>
+        <div class="campo"><label for="p-whats">WhatsApp</label><input id="p-whats" inputmode="tel" placeholder="(11) 99999-0000" value="${esc(u.whatsapp)}"></div>
+      </div>
+      ${u.instagram || u.tiktok ? `<div style="display:flex;gap:16px;flex-wrap:wrap;font-weight:600">
+        ${u.instagram ? `<a href="https://instagram.com/${encodeURIComponent(u.instagram)}" target="_blank" rel="noopener noreferrer">Ver Instagram</a>` : ''}
+        ${u.tiktok ? `<a href="https://www.tiktok.com/@${encodeURIComponent(u.tiktok)}" target="_blank" rel="noopener noreferrer">Ver TikTok</a>` : ''}</div>` : ''}
+      <button type="submit" class="btn primario" style="align-self:flex-start">Salvar perfil</button>
+    </form>
+
+    <form id="form-senha" class="caixa" novalidate style="max-width:520px">
+      <h2>Alterar senha</h2>
+      <div id="msg"></div>
+      <div class="campo"><label for="atual">Senha atual</label><input id="atual" type="password" autocomplete="current-password"></div>
+      <div class="campo"><label for="nova">Nova senha</label><input id="nova" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></div>
+      <button type="submit" class="btn" style="align-self:flex-start">Salvar nova senha</button>
+    </form>`, true);
+
+  const msgP = document.getElementById('msg-perfil');
+  const atualizarPreview = () => {
+    document.getElementById('foto-preview').innerHTML = avatar({ nome: document.getElementById('p-nome').value || u.email, foto }, 120);
+    document.getElementById('foto-remover').classList.toggle('hidden', !foto);
+    document.querySelector('label[for=foto-arquivo]').textContent = foto ? 'Trocar foto' : 'Adicionar foto';
+  };
+  document.getElementById('p-nome').oninput = (e) => {
+    document.getElementById('nome-preview').textContent = e.target.value || 'Seu nome';
+    if (!foto) atualizarPreview();
+  };
+  document.getElementById('foto-arquivo').onchange = async (e) => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    try { foto = await redimensionarFoto(f); atualizarPreview(); msgP.innerHTML = '<div class="ok" role="status">Foto pronta — clique em Salvar perfil.</div>'; }
+    catch (err) { msgP.innerHTML = `<div class="alerta" role="alert">${esc(err.message)}</div>`; }
+  };
+  document.getElementById('foto-remover').onclick = () => { foto = null; atualizarPreview(); msgP.innerHTML = ''; };
+
+  document.getElementById('form-perfil').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const btn = ev.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      const r = await api('auth', { method: 'POST', body: {
+        acao: 'perfil', foto,
+        nome: document.getElementById('p-nome').value, email: document.getElementById('p-email').value,
+        instagram: document.getElementById('p-insta').value, tiktok: document.getElementById('p-tiktok').value,
+        whatsapp: document.getElementById('p-whats').value,
+      } });
+      usuario = r.usuario;
+      telaConta();
+      toast('Perfil salvo.');
+    } catch (err) {
+      msgP.innerHTML = `<div class="alerta" role="alert">${esc(err.message)}</div>`;
+      btn.disabled = false;
+    }
+  };
+
   document.getElementById('form-senha').onsubmit = async (ev) => {
     ev.preventDefault();
     const msg = document.getElementById('msg');
