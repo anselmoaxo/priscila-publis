@@ -3,7 +3,9 @@
   "regions": ["gru1"],
   "rewrites": [{ "source": "/portfolio", "destination": "/index.html" }],
   "headers": [
-    { "source": "/(|index.html|app.js|styles.css|js/(.*))", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/:arquivo(index.html|app.js|styles.css)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/js/:caminho*", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
     {
       "source": "/(.*)",
       "headers": [
