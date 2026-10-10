@@ -11,7 +11,7 @@
           ]
         }
       },
-      "id": "ff9461bd-8503-42b4-acab-3e1458af4922",
+      "id": "e6639ad5-f032-4ee1-90b8-ffcd3cfebbd7",
       "name": "Todo dia às 8h",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -22,7 +22,7 @@
     },
     {
       "parameters": {},
-      "id": "464f1741-7abc-4fb3-b3ca-94d61df42c3d",
+      "id": "aca90015-6eff-465b-a901-be68bc27f7a0",
       "name": "Testar agora",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
@@ -37,49 +37,49 @@
         "assignments": {
           "assignments": [
             {
-              "id": "77707028-06af-45bd-b4ca-e6e911d98025",
+              "id": "2870f640-3198-4b93-921e-20900b8a4c02",
               "name": "dias",
               "value": 7,
               "type": "number"
             },
             {
-              "id": "7b93c4c2-b291-43d0-ab80-54fe48f8326c",
+              "id": "bfde858c-2e47-430c-a89c-8c0b352a2eed",
               "name": "email_de",
               "value": "Agenda de publis <seu-email@dominio.com>",
               "type": "string"
             },
             {
-              "id": "7ca66228-c42b-4d08-a9cd-d5c583d93156",
+              "id": "b546285c-3ce3-4d42-a03d-7f92f320d31f",
               "name": "email_para",
               "value": "",
               "type": "string"
             },
             {
-              "id": "79966e69-9f2c-4931-a13e-99837befdc64",
+              "id": "320e1567-641d-482f-88f9-1e970ca7240f",
               "name": "whatsapp_numeros",
               "value": "",
               "type": "string"
             },
             {
-              "id": "4f14b034-c18a-470a-9b62-87e05493598c",
+              "id": "a3b4fbb5-dfb7-4725-9bca-cce6313ef14b",
               "name": "evolution_url",
               "value": "https://sua-evolution-api.com",
               "type": "string"
             },
             {
-              "id": "e8166492-d2e8-412e-a32b-e17062c717de",
+              "id": "7d92a29e-4089-45ef-bdc5-4d16929931ce",
               "name": "evolution_instancia",
               "value": "NOME_DA_INSTANCIA",
               "type": "string"
             },
             {
-              "id": "894569ed-e84b-4107-88dc-a2ab6694d05c",
+              "id": "7c84db66-c70a-459b-8bdd-85ca97a62649",
               "name": "app_url",
               "value": "https://minhapubli.anselmotech.com.br",
               "type": "string"
             },
             {
-              "id": "9eb12c78-7230-4487-a211-d56ea57f31b8",
+              "id": "6444ff75-f1c7-4f6f-889a-f68e6df40347",
               "name": "enviar_quando_vazio",
               "value": false,
               "type": "boolean"
@@ -88,7 +88,7 @@
         },
         "options": {}
       },
-      "id": "8a6a81a0-1c05-4d58-be99-7c599c50cac1",
+      "id": "513c74be-5d95-476f-b79c-131758ccf8eb",
       "name": "Configuração",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -106,7 +106,7 @@
           "queryReplacement": "={{ $json.dias }}"
         }
       },
-      "id": "f3332c12-6381-4e82-b6c5-11db1454724b",
+      "id": "1b026570-511e-4557-ae74-9573a07a21ad",
       "name": "Buscar prazos",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
@@ -123,9 +123,9 @@
     },
     {
       "parameters": {
-        "jsCode": "// Monta o resumo diário (texto para WhatsApp e HTML para e-mail).\nconst cfg = $('Configuração').first().json;\nconst row = $('Buscar prazos').first().json;\nconst parse = (v) => (typeof v === 'string' ? JSON.parse(v) : v);\nconst itens = parse(row.itens) || [];\nconst perfil = parse(row.perfil) || {};\n\nif (!itens.length && !cfg.enviar_quando_vazio) return [];\n\nconst ROTULO = {\n  entrega: 'Postagem', prazo_marca: 'Entrega p/ marca', publicacao: 'Publicação',\n  tarefa: 'Tarefa', recebimento: 'Recebimento',\n};\nconst EMOJI = { entrega: '📲', prazo_marca: '📦', publicacao: '📣', tarefa: '✅', recebimento: '💰' };\nconst SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];\nconst fmtData = (iso) => {\n  const [a, m, d] = iso.split('-').map(Number);\n  return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')} (${SEMANA[new Date(Date.UTC(a, m - 1, d)).getUTCDay()]})`;\n};\nconst brl = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });\nconst esc = (s) => String(s ?? '').replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));\nconst appUrl = String(cfg.app_url || '').replace(/\\/+$/, '');\n\nconst grupos = [\n  { titulo: '🔴 Atrasados', filtro: (i) => i.dias < 0 },\n  { titulo: '🟠 Hoje', filtro: (i) => i.dias === 0 },\n  { titulo: '🟡 Amanhã', filtro: (i) => i.dias === 1 },\n  { titulo: `🟢 Próximos ${cfg.dias} dias`, filtro: (i) => i.dias > 1 },\n].map((g) => ({ ...g, itens: itens.filter(g.filtro) })).filter((g) => g.itens.length);\n\nconst descricao = (i) => {\n  const quem = [i.marca, i.campanha].filter(Boolean).join(' — ') || 'Sem campanha';\n  const extra = [i.hora, i.valor != null ? brl(i.valor) : null].filter(Boolean).join(' · ');\n  // Postagens e tarefas levam o tipo na frente; os demais já se explicam.\n  const oque = ['entrega', 'tarefa'].includes(i.tipo) ? `${ROTULO[i.tipo]}: ${i.titulo}` : i.titulo;\n  return { quem, extra, oque };\n};\n\n// WhatsApp\nconst nome = (perfil.nome || '').split(' ')[0];\nconst linhas = [`*Resumo das publis${nome ? ', ' + nome : ''}* · ${fmtData(row.hoje)}`, ''];\nif (!grupos.length) linhas.push(`Nada vencendo nos próximos ${cfg.dias} dias. 🎉`);\nfor (const g of grupos) {\n  linhas.push(`*${g.titulo}*`);\n  for (const i of g.itens) {\n    const { quem, extra, oque } = descricao(i);\n    linhas.push(`${EMOJI[i.tipo]} ${fmtData(i.data)} · *${quem}*`);\n    linhas.push(`   ${oque}${extra ? ' · ' + extra : ''}`);\n  }\n  linhas.push('');\n}\nconst aReceber = itens.filter((i) => i.tipo === 'recebimento').reduce((s, i) => s + Number(i.valor || 0), 0);\nif (aReceber) linhas.push(`💰 A receber no período (inclui atrasados): *${brl(aReceber)}*`);\nif (appUrl) linhas.push(`Abrir agenda: ${appUrl}/#/calendario`);\nconst whatsapp = linhas.join('\\n').trim();\n\n// E-mail\nconst linhaHtml = (i) => {\n  const { quem, extra, oque } = descricao(i);\n  const link = appUrl && i.publi_id ? `${appUrl}/#/campanhas/${i.publi_id}` : '';\n  const q = link ? `<a href=\"${esc(link)}\" style=\"color:#7c3aed;text-decoration:none\">${esc(quem)}</a>` : esc(quem);\n  return `<tr>\n    <td style=\"padding:8px;border-bottom:1px solid #eee;white-space:nowrap\">${fmtData(i.data)}</td>\n    <td style=\"padding:8px;border-bottom:1px solid #eee\">${EMOJI[i.tipo]} ${ROTULO[i.tipo]}</td>\n    <td style=\"padding:8px;border-bottom:1px solid #eee\"><strong>${q}</strong><br><span style=\"color:#555\">${esc(oque)}${extra ? ' · ' + esc(extra) : ''}</span></td>\n  </tr>`;\n};\nconst corpo = grupos.length\n  ? grupos.map((g) => `<h3 style=\"margin:24px 0 8px\">${g.titulo} (${g.itens.length})</h3>\n    <table style=\"width:100%;border-collapse:collapse;font-size:14px\">${g.itens.map(linhaHtml).join('')}</table>`).join('')\n  : `<p>Nada vencendo nos próximos ${cfg.dias} dias. 🎉</p>`;\nconst html = `<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:auto;color:#222\">\n  <h2 style=\"margin-bottom:4px\">Resumo das publis${nome ? ', ' + esc(nome) : ''}</h2>\n  <p style=\"color:#666;margin-top:0\">${fmtData(row.hoje)} · prazos até ${cfg.dias} dias</p>\n  ${corpo}\n  ${aReceber ? `<p style=\"margin-top:24px\">💰 A receber no período (inclui atrasados): <strong>${brl(aReceber)}</strong></p>` : ''}\n  ${appUrl ? `<p><a href=\"${esc(appUrl)}/#/calendario\" style=\"color:#7c3aed\">Abrir a agenda</a></p>` : ''}\n</div>`;\n\nconst atrasados = itens.filter((i) => i.dias < 0).length;\nconst assunto = `Publis: ${itens.length} prazo${itens.length === 1 ? '' : 's'} nos próximos ${cfg.dias} dias`\n  + (atrasados ? ` (${atrasados} atrasado${atrasados === 1 ? '' : 's'})` : '');\n\n// Destinos: configuração ou, se vazio, os dados do perfil no app.\nconst emailPara = String(cfg.email_para || perfil.email || '').trim();\nconst numeros = String(cfg.whatsapp_numeros || perfil.whatsapp || '')\n  .split(/[,;]/).map((n) => n.trim()).filter(Boolean)\n  .map((n) => {\n    if (n.includes('@')) return n; // grupo/JID do WhatsApp\n    const d = n.replace(/\\D/g, '');\n    return d.length === 10 || d.length === 11 ? '55' + d : d;\n  });\n\nconst base = { assunto, html, whatsapp, email_para: emailPara, total: itens.length, atrasados };\nreturn numeros.length\n  ? numeros.map((numero) => ({ json: { ...base, numero } }))\n  : [{ json: { ...base, numero: null } }];\n"
+        "jsCode": "// Monta o resumo diário (texto para WhatsApp e HTML para e-mail).\nconst cfg = $('Configuração').first().json;\nconst row = $('Buscar prazos').first().json;\nconst parse = (v) => (typeof v === 'string' ? JSON.parse(v) : v);\nconst itens = parse(row.itens) || [];\nconst perfil = parse(row.perfil) || {};\n\nif (!itens.length && !cfg.enviar_quando_vazio) return [];\n\nconst ROTULO = {\n  entrega: 'Postagem', prazo_marca: 'Entrega p/ marca', publicacao: 'Publicação',\n  tarefa: 'Tarefa', recebimento: 'Recebimento',\n};\nconst EMOJI = { entrega: '📲', prazo_marca: '📦', publicacao: '📣', tarefa: '✅', recebimento: '💰' };\nconst SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];\nconst fmtData = (iso) => {\n  const [a, m, d] = iso.split('-').map(Number);\n  return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')} (${SEMANA[new Date(Date.UTC(a, m - 1, d)).getUTCDay()]})`;\n};\nconst brl = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });\nconst esc = (s) => String(s ?? '').replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));\nconst appUrl = String(cfg.app_url || '').replace(/\\/+$/, '');\n\n// Agrupa por marca (tudo da Pantene junto); as marcas com o prazo mais próximo vêm primeiro.\nconst grupos = [];\nfor (const i of itens) {\n  const marca = i.marca || 'Sem campanha';\n  let g = grupos.find((x) => x.marca === marca);\n  if (!g) grupos.push((g = { marca, itens: [], campanhas: [] }));\n  g.itens.push(i);\n  if (i.publi_id && !g.campanhas.some((c) => c.id === i.publi_id)) g.campanhas.push({ id: i.publi_id, nome: i.campanha });\n}\nfor (const g of grupos) {\n  // Com uma campanha só, o nome dela vai no título; com várias, em cada linha.\n  g.varias = g.campanhas.length > 1;\n  g.titulo = !g.varias && g.campanhas[0]?.nome ? `${g.marca} — ${g.campanhas[0].nome}` : g.marca;\n}\nconst quando = (i) => (i.dias < 0 ? `🔴 atrasado · ${fmtData(i.data)}` : i.dias === 0 ? '🟠 hoje'\n  : i.dias === 1 ? '🟡 amanhã' : fmtData(i.data));\nconst descricao = (i, g) => {\n  const extra = [i.hora, i.valor != null ? brl(i.valor) : null].filter(Boolean).join(' · ');\n  // Postagens e tarefas levam o tipo na frente; os demais já se explicam.\n  const oque = ['entrega', 'tarefa'].includes(i.tipo) ? `${ROTULO[i.tipo]}: ${i.titulo}` : i.titulo;\n  const camp = g.varias && i.campanha ? `[${i.campanha}] ` : '';\n  return { extra, oque: camp + oque };\n};\n\n// WhatsApp\nconst nome = (perfil.nome || '').split(' ')[0];\nconst linhas = [`*Resumo das publis${nome ? ', ' + nome : ''}* · ${fmtData(row.hoje)}`, ''];\nif (!grupos.length) linhas.push(`Nada vencendo nos próximos ${cfg.dias} dias. 🎉`);\nfor (const g of grupos) {\n  linhas.push(`*${g.titulo}*`);\n  for (const i of g.itens) {\n    const { extra, oque } = descricao(i, g);\n    linhas.push(`${EMOJI[i.tipo]} ${quando(i)} · ${oque}${extra ? ' · ' + extra : ''}`);\n  }\n  if (appUrl) for (const c of g.campanhas) {\n    linhas.push(`🔗 ${g.varias && c.nome ? c.nome + ': ' : ''}${appUrl}/#/campanhas/${c.id}`);\n  }\n  linhas.push('');\n}\nconst aReceber = itens.filter((i) => i.tipo === 'recebimento').reduce((s, i) => s + Number(i.valor || 0), 0);\nif (aReceber) linhas.push(`💰 A receber no período (inclui atrasados): *${brl(aReceber)}*`);\nif (appUrl) linhas.push(`Abrir agenda: ${appUrl}/#/calendario`);\nconst whatsapp = linhas.join('\\n').trim();\n\n// E-mail\nconst linhaHtml = (i, g) => {\n  const { extra, oque } = descricao(i, g);\n  const cor = i.dias < 0 ? '#c62828' : i.dias === 0 ? '#e65100' : i.dias === 1 ? '#b8860b' : '#555';\n  return `<tr>\n    <td style=\"padding:6px 8px;border-bottom:1px solid #eee;white-space:nowrap;color:${cor}\">${quando(i)}</td>\n    <td style=\"padding:6px 8px;border-bottom:1px solid #eee\">${EMOJI[i.tipo]} ${esc(oque)}${extra ? ' · ' + esc(extra) : ''}</td>\n  </tr>`;\n};\nconst corpo = grupos.length\n  ? grupos.map((g) => {\n      const links = appUrl ? g.campanhas.map((c) => `<a href=\"${esc(`${appUrl}/#/campanhas/${c.id}`)}\" style=\"color:#7c3aed\">${esc(g.varias ? c.nome || 'Abrir campanha' : 'Abrir campanha')}</a>`).join(' · ') : '';\n      return `<h3 style=\"margin:24px 0 4px\">${esc(g.titulo)} (${g.itens.length})</h3>\n    ${links ? `<p style=\"margin:0 0 8px;font-size:13px\">${links}</p>` : ''}\n    <table style=\"width:100%;border-collapse:collapse;font-size:14px\">${g.itens.map((i) => linhaHtml(i, g)).join('')}</table>`;\n    }).join('')\n  : `<p>Nada vencendo nos próximos ${cfg.dias} dias. 🎉</p>`;\nconst html = `<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:auto;color:#222\">\n  <h2 style=\"margin-bottom:4px\">Resumo das publis${nome ? ', ' + esc(nome) : ''}</h2>\n  <p style=\"color:#666;margin-top:0\">${fmtData(row.hoje)} · prazos até ${cfg.dias} dias</p>\n  ${corpo}\n  ${aReceber ? `<p style=\"margin-top:24px\">💰 A receber no período (inclui atrasados): <strong>${brl(aReceber)}</strong></p>` : ''}\n  ${appUrl ? `<p><a href=\"${esc(appUrl)}/#/calendario\" style=\"color:#7c3aed\">Abrir a agenda</a></p>` : ''}\n</div>`;\n\nconst atrasados = itens.filter((i) => i.dias < 0).length;\nconst assunto = `Publis: ${itens.length} prazo${itens.length === 1 ? '' : 's'} nos próximos ${cfg.dias} dias`\n  + (atrasados ? ` (${atrasados} atrasado${atrasados === 1 ? '' : 's'})` : '');\n\n// Destinos: configuração ou, se vazio, os dados do perfil no app.\nconst emailPara = String(cfg.email_para || perfil.email || '').trim();\nconst numeros = String(cfg.whatsapp_numeros || perfil.whatsapp || '')\n  .split(/[,;]/).map((n) => n.trim()).filter(Boolean)\n  .map((n) => {\n    if (n.includes('@')) return n; // grupo/JID do WhatsApp\n    const d = n.replace(/\\D/g, '');\n    return d.length === 10 || d.length === 11 ? '55' + d : d;\n  });\n\nconst base = { assunto, html, whatsapp, email_para: emailPara, total: itens.length, atrasados };\nreturn numeros.length\n  ? numeros.map((numero) => ({ json: { ...base, numero } }))\n  : [{ json: { ...base, numero: null } }];\n"
       },
-      "id": "e0502e4e-8e17-4171-a7d3-2eb08ac084ca",
+      "id": "a343cee0-b87c-4ff9-8728-ca0adfcf9dcf",
       "name": "Montar resumo",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -143,7 +143,7 @@
         "html": "={{ $json.html }}",
         "options": {}
       },
-      "id": "12df75bc-0eb1-435b-8c7b-6f92c14c1e0b",
+      "id": "6f1fff55-ea98-4291-8731-79868aa4f203",
       "name": "Enviar e-mail",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
@@ -170,7 +170,7 @@
         "jsonBody": "={{ JSON.stringify({ number: $json.numero, text: $json.whatsapp }) }}",
         "options": {}
       },
-      "id": "c8e9799e-eb99-4e6b-994c-7692761e8389",
+      "id": "c7cf38b5-5063-4d61-81b8-9a76cfccff77",
       "name": "Enviar WhatsApp (Evolution API)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
