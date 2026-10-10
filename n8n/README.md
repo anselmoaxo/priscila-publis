@@ -3,6 +3,7 @@
 Workflow que, todo dia às 8h (horário de Brasília), lê o banco do app e envia um resumo do que vence nos próximos 7 dias, mais o que já está atrasado, por e-mail e por WhatsApp (Evolution API).
 
 - `publis-resumo-diario.json`: o workflow para importar no n8n.
+- `publis-aviso-vespera.json`: aviso curto, todo dia às 18h, com as entregas que vencem no dia seguinte.
 - `publis-a-vencer.sql`: a consulta usada no nó "Buscar prazos" (cópia para referência).
 
 ## O que entra no resumo
@@ -37,3 +38,10 @@ Campanhas canceladas ficam de fora. Os itens são agrupados em Atrasados, Hoje, 
 4. Clique em **Test workflow** (gatilho "Testar agora") para conferir e depois ative o workflow.
 
 O fuso do workflow já vem como `America/Sao_Paulo` (Settings do workflow). O envio de WhatsApp usa o endpoint da Evolution API v2 `POST /message/sendText/{instancia}` com `{ number, text }`. Na v1 o corpo é `{ number, textMessage: { text } }`: troque o JSON Body do nó se for o seu caso.
+
+## Aviso na véspera da entrega
+
+`publis-aviso-vespera.json` é um segundo workflow, importado e configurado do mesmo jeito (pode reaproveitar as três credenciais). Ele roda às 18h e só envia mensagem quando existe postagem, entrega para a marca ou publicação prevista vencendo amanhã. Nos outros dias não manda nada.
+
+- `dias` no nó Configuração: com quantos dias de antecedência avisar (1 = véspera, 2 = dois dias antes).
+- Para mudar o horário, edite o nó "Todo dia às 18h".
