@@ -8,7 +8,9 @@ Workflow que, todo dia às 8h (horário de Brasília), lê o banco do app e envi
 
 ## O que entra no resumo
 
-Só prazos em aberto, com as mesmas regras da agenda e da visão geral do app:
+As mensagens mostram só a **data de entrega da publi** (campo de entrega da campanha, `publis.fim`), enquanto a campanha não estiver aprovada, agendada, publicada, concluída ou cancelada. A consulta SQL traz também os outros prazos abaixo; para incluí-los de volta, remova o filtro `tipo === 'prazo_marca'` no nó de código.
+
+Prazos que a consulta traz:
 
 | Tipo | Origem | Considerado concluído quando |
 | --- | --- | --- |
