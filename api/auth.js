@@ -1,15 +1,9 @@
 import bcrypt from 'bcryptjs';
 import { sql } from '../lib/db.js';
-import { timingSafeEqual } from 'node:crypto';
 import { rota, erro, criarSessao, encerrarSessao, lerSessao, texto } from '../lib/http.js';
 
-// New accounts after the first one need the invite code (CODIGO_CONVITE). Without it, sign-up stays closed.
-const CONVITE = process.env.CODIGO_CONVITE || '';
-function conviteValido(v) {
-  if (!CONVITE) return false;
-  const a = Buffer.from(String(v || '').trim()), b = Buffer.from(CONVITE);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
+// Open sign-up up to LIMITE_CONTAS accounts in total (default 4); after that it closes.
+const LIMITE = Math.max(1, parseInt(process.env.LIMITE_CONTAS, 10) || 4);
 
 // Simple per-instance throttle for failed logins.
 const falhas = new Map();
@@ -28,9 +22,10 @@ export default rota(async ({ req, res, body }) => {
   if (req.method === 'GET') {
     const [{ n }] = await sql`SELECT count(*)::int AS n FROM usuarios`;
     const sessao = await lerSessao(req);
-    if (!sessao) return { logado: false, precisaCadastro: n === 0, cadastroAberto: !!CONVITE };
+    const cadastroAberto = n < LIMITE;
+    if (!sessao) return { logado: false, precisaCadastro: n === 0, cadastroAberto };
     const [u] = await sql`SELECT id, nome, email, foto, instagram, tiktok, whatsapp FROM usuarios WHERE id = ${sessao.uid}`;
-    if (!u) { encerrarSessao(res); return { logado: false, precisaCadastro: n === 0, cadastroAberto: !!CONVITE }; }
+    if (!u) { encerrarSessao(res); return { logado: false, precisaCadastro: n === 0, cadastroAberto }; }
     return { logado: true, usuario: u };
   }
 
@@ -45,21 +40,22 @@ export default rota(async ({ req, res, body }) => {
     const nome = texto(body.nome, 100) || '';
     if (!/^\S+@\S+\.\S+$/.test(email)) throw erro(400, 'Informe um e-mail válido.');
     if (senha.length < 8) throw erro(400, 'A senha precisa ter pelo menos 8 caracteres.');
-    const convite = conviteValido(body.convite);
-    if (body.convite && !convite) throw erro(403, 'Código de convite inválido.');
     const hash = await bcrypt.hash(senha, 10);
-    // The first account needs no invite; the next ones do.
     let rows;
     try {
-      rows = await sql`INSERT INTO usuarios (nome, email, senha_hash)
-        SELECT ${nome}, ${email}, ${hash}
-        WHERE ${convite} OR NOT EXISTS (SELECT 1 FROM usuarios)
-        RETURNING id, nome, email`;
+      // The lock serializes sign-ups so two at once can't go past the limit.
+      [, rows] = await sql.transaction([
+        sql`SELECT pg_advisory_xact_lock(7101)`,
+        sql`INSERT INTO usuarios (nome, email, senha_hash)
+          SELECT ${nome}, ${email}, ${hash}
+          WHERE (SELECT count(*) FROM usuarios) < ${LIMITE}
+          RETURNING id, nome, email`,
+      ]);
     } catch (e) {
       if (e.code === '23505') throw erro(400, 'Esse e-mail já tem conta. Faça login.');
       throw e;
     }
-    if (!rows.length) throw erro(403, CONVITE ? 'Para criar uma conta, informe o código de convite.' : 'O cadastro está fechado. Faça login.');
+    if (!rows.length) throw erro(403, 'As vagas para novas contas acabaram. Fale com quem te indicou o sistema.');
     await criarSessao(res, rows[0], true);
     return { ok: true, usuario: rows[0] };
   }
