@@ -36,33 +36,52 @@ function publico(u, marcas) {
   };
 }
 
-export default rota(async ({ req, body, query }) => {
-  const [u] = await sql`SELECT id, nome, foto, bio, nichos, instagram, tiktok, whatsapp, portfolio_publico, portfolio
-    FROM usuarios ORDER BY id LIMIT 1`;
+// Lowercase letters, digits and hyphens: "Priscila Souza" -> "priscila-souza".
+function slugDe(v) {
+  return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+}
 
+export default rota(async ({ req, body, query }) => {
   if (req.method === 'GET' && !query.editar) {
+    // /portfolio/<slug>; plain /portfolio keeps showing the first account (the original link).
+    const slug = slugDe(query.u);
+    const [u] = slug
+      ? await sql`SELECT id, nome, foto, bio, nichos, instagram, tiktok, whatsapp, portfolio_publico, portfolio
+          FROM usuarios WHERE lower(slug) = ${slug}`
+      : await sql`SELECT id, nome, foto, bio, nichos, instagram, tiktok, whatsapp, portfolio_publico, portfolio
+          FROM usuarios ORDER BY id LIMIT 1`;
     if (!u || !u.portfolio_publico) throw erro(404, 'Este portfólio não está disponível.');
-    const marcas = await sql`SELECT nome FROM marcas WHERE mostrar_portfolio ORDER BY lower(nome)`;
+    const marcas = await sql`SELECT nome FROM marcas WHERE usuario_id = ${u.id} AND mostrar_portfolio ORDER BY lower(nome)`;
     return publico(u, marcas);
   }
 
   const sessao = await lerSessao(req);
-  if (!sessao || !u || String(sessao.uid) !== String(u.id)) throw erro(401, 'Faça login para continuar.');
+  const [u] = sessao ? await sql`SELECT id, nome, slug, bio, nichos, portfolio_publico, portfolio
+    FROM usuarios WHERE id = ${sessao.uid}` : [];
+  if (!u) throw erro(401, 'Faça login para continuar.');
 
   if (req.method === 'GET') {
-    const marcas = await sql`SELECT id, nome, mostrar_portfolio FROM marcas ORDER BY lower(nome)`;
-    return { publicado: u.portfolio_publico, bio: u.bio || '', nichos: u.nichos || '', portfolio: u.portfolio || {}, marcas };
+    const marcas = await sql`SELECT id, nome, mostrar_portfolio FROM marcas WHERE usuario_id = ${u.id} ORDER BY lower(nome)`;
+    return { publicado: u.portfolio_publico, slug: u.slug || '', sugestao_slug: slugDe(u.nome), bio: u.bio || '', nichos: u.nichos || '', portfolio: u.portfolio || {}, marcas };
   }
 
   if (req.method === 'PUT') {
     const p = normalizar(body.portfolio || {});
     const marcasIds = (Array.isArray(body.marcas) ? body.marcas : []).map((x) => parseInt(x, 10)).filter((x) => x > 0);
+    const slug = slugDe(body.slug) || null;
+    if (slug && slug.length < 3) throw erro(400, 'O endereço do portfólio precisa ter pelo menos 3 letras ou números.');
+    if (body.publicado && !slug) throw erro(400, 'Escolha o endereço do seu portfólio antes de publicar.');
+    if (slug) {
+      const [dup] = await sql`SELECT 1 FROM usuarios WHERE lower(slug) = ${slug} AND id <> ${u.id}`;
+      if (dup) throw erro(400, 'Esse endereço já está em uso. Escolha outro.');
+    }
     await sql.transaction([
-      sql`UPDATE usuarios SET portfolio_publico = ${!!body.publicado}, bio = ${texto(body.bio, 1200)},
+      sql`UPDATE usuarios SET portfolio_publico = ${!!body.publicado}, slug = ${slug}, bio = ${texto(body.bio, 1200)},
         nichos = ${texto(body.nichos, 300)}, portfolio = ${JSON.stringify(p)}::jsonb WHERE id = ${u.id}`,
-      sql`UPDATE marcas SET mostrar_portfolio = (id = ANY(${marcasIds}::int[]))`,
+      sql`UPDATE marcas SET mostrar_portfolio = (id = ANY(${marcasIds}::int[])) WHERE usuario_id = ${u.id}`,
     ]);
-    return { ok: true };
+    return { ok: true, slug };
   }
 
   throw erro(405, 'Método não permitido.');

@@ -1,6 +1,6 @@
 import { sql } from '../lib/db.js';
 import { rota, erro, texto, data } from '../lib/http.js';
-import { TIPOS_TAREFA, registrar, hojeJS } from '../lib/dominio.js';
+import { TIPOS_TAREFA, registrar, hojeJS, publiDaConta } from '../lib/dominio.js';
 
 function normalizar(b) {
   const titulo = texto(b.titulo, 200);
@@ -18,7 +18,7 @@ function normalizar(b) {
   };
 }
 
-export default rota(async ({ req, body, query }) => {
+export default rota(async ({ req, body, query, uid }) => {
   const id = query.id ? parseInt(query.id, 10) : null;
 
   if (req.method === 'GET') {
@@ -26,18 +26,15 @@ export default rota(async ({ req, body, query }) => {
     return sql`
       SELECT t.*, p.nome AS campanha_nome, p.marca
       FROM tarefas t LEFT JOIN publis p ON p.id = t.publi_id
-      WHERE (${publi}::int IS NULL OR t.publi_id = ${publi}::int)
+      WHERE t.usuario_id = ${uid} AND (${publi}::int IS NULL OR t.publi_id = ${publi}::int)
       ORDER BY t.status = 'feita', t.prazo NULLS LAST, CASE t.prioridade WHEN 'alta' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, t.id`;
   }
 
   if (req.method === 'POST') {
     const t = normalizar(body);
-    if (t.publi_id) {
-      const [p] = await sql`SELECT id FROM publis WHERE id = ${t.publi_id}`;
-      if (!p) throw erro(400, 'Campanha não encontrada.');
-    }
-    const [r] = await sql`INSERT INTO tarefas (titulo, tipo, prazo, hora, status, prioridade, publi_id, observacoes, concluida_em)
-      VALUES (${t.titulo}, ${t.tipo}, ${t.prazo}, ${t.hora}, ${t.status}, ${t.prioridade}, ${t.publi_id}, ${t.observacoes},
+    if (t.publi_id && !await publiDaConta(t.publi_id, uid)) throw erro(400, 'Campanha não encontrada.');
+    const [r] = await sql`INSERT INTO tarefas (usuario_id, titulo, tipo, prazo, hora, status, prioridade, publi_id, observacoes, concluida_em)
+      VALUES (${uid}, ${t.titulo}, ${t.tipo}, ${t.prazo}, ${t.hora}, ${t.status}, ${t.prioridade}, ${t.publi_id}, ${t.observacoes},
         ${t.status === 'feita' ? hojeJS() : null})
       RETURNING id`;
     if (t.publi_id) await registrar(t.publi_id, `Tarefa adicionada: ${t.titulo}`);
@@ -47,17 +44,18 @@ export default rota(async ({ req, body, query }) => {
   if (req.method === 'PUT') {
     if (!id) throw erro(400, 'Tarefa não informada.');
     const t = normalizar(body);
+    if (t.publi_id && !await publiDaConta(t.publi_id, uid)) throw erro(400, 'Campanha não encontrada.');
     const r = await sql`UPDATE tarefas SET titulo=${t.titulo}, tipo=${t.tipo}, prazo=${t.prazo}, hora=${t.hora}, status=${t.status},
         prioridade=${t.prioridade}, publi_id=${t.publi_id}, observacoes=${t.observacoes},
         concluida_em = CASE WHEN ${t.status} = 'feita' THEN COALESCE(concluida_em, ${hojeJS()}::date) ELSE NULL END
-      WHERE id=${id} RETURNING id`;
+      WHERE id=${id} AND usuario_id=${uid} RETURNING id`;
     if (!r.length) throw erro(404, 'Tarefa não encontrada.');
     return { id };
   }
 
   if (req.method === 'DELETE') {
     if (!id) throw erro(400, 'Tarefa não informada.');
-    await sql`DELETE FROM tarefas WHERE id = ${id}`;
+    await sql`DELETE FROM tarefas WHERE id = ${id} AND usuario_id = ${uid}`;
     return { ok: true };
   }
 

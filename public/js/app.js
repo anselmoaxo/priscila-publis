@@ -34,7 +34,8 @@ const ROTAS = [
 const APELIDOS = { '/painel': '/inicio', '/publis': '/campanhas', '/publis/nova': '/campanhas/nova', '/financeiro': '/relatorios/receber', '/conta': '/configuracoes' };
 
 async function rotear() {
-  if (location.pathname.replace(/\/$/, '') === '/portfolio') return telaPortfolioPublico();
+  const port = location.pathname.replace(/\/$/, '').match(/^\/portfolio(?:\/([^/]+))?$/);
+  if (port) return telaPortfolioPublico(port[1] ? decodeURIComponent(port[1]) : '');
   let [caminho, busca = ''] = location.hash.replace(/^#/, '').split('?');
   caminho = caminho || '/inicio';
   const antigo = caminho.match(/^\/publis\/(\d+)(\/editar)?$/);

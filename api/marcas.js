@@ -20,17 +20,17 @@ function normalizar(b) {
   };
 }
 
-export default rota(async ({ req, body, query }) => {
+export default rota(async ({ req, body, query, uid }) => {
   const id = query.id ? parseInt(query.id, 10) : null;
 
   if (req.method === 'GET') {
     if (id) {
-      const [m] = await sql`SELECT * FROM marcas WHERE id = ${id}`;
+      const [m] = await sql`SELECT * FROM marcas WHERE id = ${id} AND usuario_id = ${uid}`;
       if (!m) throw erro(404, 'Marca não encontrada.');
       m.campanhas = await sql`
         SELECT p.id, p.nome, p.status, p.inicio, p.fim, p.tipo_pagamento, p.permuta_valor,
           COALESCE((SELECT sum(valor) FROM parcelas x WHERE x.publi_id = p.id), 0) AS valor_dinheiro
-        FROM publis p WHERE p.marca_id = ${id} ORDER BY COALESCE(p.inicio, p.criado_em::date) DESC`;
+        FROM publis p WHERE p.marca_id = ${id} AND p.usuario_id = ${uid} ORDER BY COALESCE(p.inicio, p.criado_em::date) DESC`;
       return m;
     }
     return sql`
@@ -38,15 +38,16 @@ export default rota(async ({ req, body, query }) => {
         count(p.id) FILTER (WHERE p.status NOT IN ('concluido','cancelado','publicado'))::int AS ativas,
         max(COALESCE(p.inicio, p.criado_em::date)) AS ultima
       FROM marcas m LEFT JOIN publis p ON p.marca_id = m.id
+      WHERE m.usuario_id = ${uid}
       GROUP BY m.id ORDER BY lower(m.nome)`;
   }
 
   if (req.method === 'POST') {
     const m = normalizar(body);
-    const [dup] = await sql`SELECT id FROM marcas WHERE lower(nome) = lower(${m.nome})`;
+    const [dup] = await sql`SELECT id FROM marcas WHERE usuario_id = ${uid} AND lower(nome) = lower(${m.nome})`;
     if (dup) throw erro(400, 'Já existe uma marca com esse nome.');
-    const [r] = await sql`INSERT INTO marcas (nome, tipo, contato_nome, email, telefone, instagram, site, observacoes, mostrar_portfolio)
-      VALUES (${m.nome}, ${m.tipo}, ${m.contato_nome}, ${m.email}, ${m.telefone}, ${m.instagram}, ${m.site}, ${m.observacoes}, ${m.mostrar_portfolio})
+    const [r] = await sql`INSERT INTO marcas (usuario_id, nome, tipo, contato_nome, email, telefone, instagram, site, observacoes, mostrar_portfolio)
+      VALUES (${uid}, ${m.nome}, ${m.tipo}, ${m.contato_nome}, ${m.email}, ${m.telefone}, ${m.instagram}, ${m.site}, ${m.observacoes}, ${m.mostrar_portfolio})
       RETURNING id`;
     return { id: r.id };
   }
@@ -54,21 +55,21 @@ export default rota(async ({ req, body, query }) => {
   if (req.method === 'PUT') {
     if (!id) throw erro(400, 'Marca não informada.');
     const m = normalizar(body);
-    const [dup] = await sql`SELECT id FROM marcas WHERE lower(nome) = lower(${m.nome}) AND id <> ${id}`;
+    const [dup] = await sql`SELECT id FROM marcas WHERE usuario_id = ${uid} AND lower(nome) = lower(${m.nome}) AND id <> ${id}`;
     if (dup) throw erro(400, 'Já existe uma marca com esse nome.');
     const r = await sql`UPDATE marcas SET nome=${m.nome}, tipo=${m.tipo}, contato_nome=${m.contato_nome}, email=${m.email},
       telefone=${m.telefone}, instagram=${m.instagram}, site=${m.site}, observacoes=${m.observacoes}, mostrar_portfolio=${m.mostrar_portfolio}
-      WHERE id=${id} RETURNING id`;
+      WHERE id=${id} AND usuario_id=${uid} RETURNING id`;
     if (!r.length) throw erro(404, 'Marca não encontrada.');
-    await sql`UPDATE publis SET marca = ${m.nome} WHERE marca_id = ${id}`;
+    await sql`UPDATE publis SET marca = ${m.nome} WHERE marca_id = ${id} AND usuario_id = ${uid}`;
     return { id };
   }
 
   if (req.method === 'DELETE') {
     if (!id) throw erro(400, 'Marca não informada.');
-    const [{ n }] = await sql`SELECT count(*)::int AS n FROM publis WHERE marca_id = ${id}`;
+    const [{ n }] = await sql`SELECT count(*)::int AS n FROM publis WHERE marca_id = ${id} AND usuario_id = ${uid}`;
     if (n > 0) throw erro(400, 'Essa marca tem campanhas. Exclua ou mude as campanhas antes de excluir a marca.');
-    await sql`DELETE FROM marcas WHERE id = ${id}`;
+    await sql`DELETE FROM marcas WHERE id = ${id} AND usuario_id = ${uid}`;
     return { ok: true };
   }
 
