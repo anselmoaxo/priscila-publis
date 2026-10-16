@@ -61,8 +61,8 @@ function normalizar(b) {
 
 const col = (arr, k) => arr.map((x) => x[k]);
 
-async function carregar(id) {
-  const [publi] = await sql`SELECT * FROM publis WHERE id = ${id}`;
+async function carregar(id, uid) {
+  const [publi] = await sql`SELECT * FROM publis WHERE id = ${id} AND usuario_id = ${uid}`;
   if (!publi) throw erro(404, 'Campanha não encontrada.');
   const [entregas, parcelas, tarefas, materiais, historico, marca] = await Promise.all([
     sql`SELECT * FROM entregas WHERE publi_id = ${id} ORDER BY data_postagem NULLS LAST, id`,
@@ -75,12 +75,12 @@ async function carregar(id) {
   return { ...publi, entregas, parcelas, tarefas, materiais, historico, marca_info: marca[0] || null };
 }
 
-export default rota(async ({ req, body, query }) => {
+export default rota(async ({ req, body, query, uid }) => {
   const id = query.id ? parseInt(query.id, 10) : null;
   const hoje = hojeJS();
 
   if (req.method === 'GET') {
-    if (id) return carregar(id);
+    if (id) return carregar(id, uid);
     return sql`
       SELECT p.id, p.nome, p.marca, p.marca_id, p.produto, p.agencia, p.inicio, p.fim, p.data_publicacao, p.status,
         p.tipo_pagamento, p.permuta_valor, p.permuta_recebida_em, p.atualizado_em,
@@ -100,7 +100,7 @@ export default rota(async ({ req, body, query }) => {
         SELECT publi_id, sum(valor) total,
           sum(valor) FILTER (WHERE pago_em IS NOT NULL) recebido,
           sum(valor) FILTER (WHERE pago_em IS NULL AND vencimento < ${hoje}::date) atrasado
-        FROM parcelas GROUP BY publi_id
+        FROM parcelas WHERE publi_id IN (SELECT id FROM publis WHERE usuario_id = ${uid}) GROUP BY publi_id
       ) pa ON pa.publi_id = p.id
       LEFT JOIN (
         SELECT publi_id, count(*) qtd,
@@ -108,24 +108,25 @@ export default rota(async ({ req, body, query }) => {
           min(data_postagem) FILTER (WHERE status <> 'publicado') proxima,
           array_agg(DISTINCT rede) plataformas,
           array_agg(DISTINCT formato) formatos
-        FROM entregas GROUP BY publi_id
+        FROM entregas WHERE publi_id IN (SELECT id FROM publis WHERE usuario_id = ${uid}) GROUP BY publi_id
       ) en ON en.publi_id = p.id
       LEFT JOIN (
         SELECT publi_id, count(*) FILTER (WHERE status <> 'feita') pendentes,
           min(prazo) FILTER (WHERE status <> 'feita') proxima
-        FROM tarefas WHERE publi_id IS NOT NULL GROUP BY publi_id
+        FROM tarefas WHERE usuario_id = ${uid} AND publi_id IS NOT NULL GROUP BY publi_id
       ) ta ON ta.publi_id = p.id
+      WHERE p.usuario_id = ${uid}
       ORDER BY (p.status IN ('concluido','cancelado')), COALESCE(p.inicio, p.criado_em::date) DESC, p.id DESC`;
   }
 
   if (req.method === 'POST') {
     const { p, entregas: e, parcelas: pa } = normalizar(body);
-    const m = await garantirMarca(p.marca);
+    const m = await garantirMarca(p.marca, uid);
     const [row] = await sql`
       WITH np AS (
-        INSERT INTO publis (nome, marca, marca_id, produto, agencia, contato, contrato_url, inicio, fim, data_publicacao, status,
+        INSERT INTO publis (usuario_id, nome, marca, marca_id, produto, agencia, contato, contrato_url, inicio, fim, data_publicacao, status,
           briefing, notas, links, tipo_pagamento, forma_pagamento, permuta_descricao, permuta_valor, permuta_recebida_em, observacoes)
-        VALUES (${p.nome}, ${m.nome}, ${m.id}, ${p.produto}, ${p.agencia}, ${p.contato}, ${p.contrato_url}, ${p.inicio}, ${p.fim},
+        VALUES (${uid}, ${p.nome}, ${m.nome}, ${m.id}, ${p.produto}, ${p.agencia}, ${p.contato}, ${p.contrato_url}, ${p.inicio}, ${p.fim},
           ${p.data_publicacao}, ${p.status}, ${p.briefing}, ${p.notas}, ${JSON.stringify(p.links)}::jsonb, ${p.tipo_pagamento},
           ${p.forma_pagamento}, ${p.permuta_descricao}, ${p.permuta_valor}, ${p.permuta_recebida_em}, ${p.observacoes})
         RETURNING id
@@ -149,9 +150,9 @@ export default rota(async ({ req, body, query }) => {
   if (req.method === 'PUT') {
     if (!id) throw erro(400, 'Campanha não informada.');
     const { p, entregas: e, parcelas: pa } = normalizar(body);
-    const [antes] = await sql`SELECT id, status FROM publis WHERE id = ${id}`;
+    const [antes] = await sql`SELECT id, status FROM publis WHERE id = ${id} AND usuario_id = ${uid}`;
     if (!antes) throw erro(404, 'Campanha não encontrada.');
-    const m = await garantirMarca(p.marca);
+    const m = await garantirMarca(p.marca, uid);
     const eOld = e.filter((x) => x.id), eNew = e.filter((x) => !x.id);
     const pOld = pa.filter((x) => x.id), pNew = pa.filter((x) => !x.id);
     await sql.transaction([
@@ -160,7 +161,7 @@ export default rota(async ({ req, body, query }) => {
         status=${p.status}, briefing=${p.briefing}, notas=${p.notas}, links=${JSON.stringify(p.links)}::jsonb,
         tipo_pagamento=${p.tipo_pagamento}, forma_pagamento=${p.forma_pagamento},
         permuta_descricao=${p.permuta_descricao}, permuta_valor=${p.permuta_valor}, permuta_recebida_em=${p.permuta_recebida_em},
-        observacoes=${p.observacoes}, atualizado_em=now() WHERE id=${id}`,
+        observacoes=${p.observacoes}, atualizado_em=now() WHERE id=${id} AND usuario_id=${uid}`,
       sql`DELETE FROM entregas WHERE publi_id=${id} AND NOT (id = ANY(${col(eOld, 'id')}::int[]))`,
       sql`UPDATE entregas t SET rede=v.rede, formato=v.formato, quantidade=v.quantidade, data_postagem=v.data_postagem, status=v.status
         FROM unnest(${col(eOld, 'id')}::int[], ${col(eOld, 'rede')}::text[], ${col(eOld, 'formato')}::text[],
@@ -188,7 +189,7 @@ export default rota(async ({ req, body, query }) => {
 
   if (req.method === 'DELETE') {
     if (!id) throw erro(400, 'Campanha não informada.');
-    await sql`DELETE FROM publis WHERE id = ${id}`;
+    await sql`DELETE FROM publis WHERE id = ${id} AND usuario_id = ${uid}`;
     return { ok: true };
   }
 

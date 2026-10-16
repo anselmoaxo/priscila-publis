@@ -2,7 +2,7 @@ import { sql } from '../lib/db.js';
 import { rota, erro, data } from '../lib/http.js';
 
 // Parcelas + permutas within a date range (defaults to current month), plus totals.
-export default rota(async ({ req, query }) => {
+export default rota(async ({ req, query, uid }) => {
   if (req.method !== 'GET') throw erro(405, 'Método não permitido.');
   const de = data(query.de);
   const ate = data(query.ate);
@@ -17,20 +17,22 @@ export default rota(async ({ req, query }) => {
              ELSE 'aberto' END AS situacao,
         NULL::text AS descricao
       FROM parcelas pa JOIN publis p ON p.id = pa.publi_id
+      WHERE p.usuario_id = ${uid}
       UNION ALL
       SELECT 'permuta', p.id, p.id, p.marca, COALESCE(p.permuta_recebida_em, p.inicio, p.criado_em::date), p.permuta_valor,
         NULL, NULL, p.permuta_recebida_em,
         CASE WHEN p.permuta_recebida_em IS NOT NULL THEN 'permuta_recebida' ELSE 'permuta_pendente' END,
         p.permuta_descricao
-      FROM publis p WHERE p.tipo_pagamento <> 'dinheiro'
+      FROM publis p WHERE p.usuario_id = ${uid} AND p.tipo_pagamento <> 'dinheiro'
     ) t
     WHERE (${de}::date IS NULL OR t.data >= ${de}::date)
       AND (${ate}::date IS NULL OR t.data <= ${ate}::date)
     ORDER BY t.data, t.marca`;
 
   const [atraso] = await sql`
-    SELECT COALESCE(sum(valor), 0) AS valor, count(*)::int AS qtd
-    FROM parcelas WHERE pago_em IS NULL AND vencimento < (now() AT TIME ZONE 'America/Sao_Paulo')::date`;
+    SELECT COALESCE(sum(pa.valor), 0) AS valor, count(*)::int AS qtd
+    FROM parcelas pa JOIN publis p ON p.id = pa.publi_id
+    WHERE p.usuario_id = ${uid} AND pa.pago_em IS NULL AND pa.vencimento < (now() AT TIME ZONE 'America/Sao_Paulo')::date`;
 
   return { linhas, atrasadoGeral: atraso };
 });

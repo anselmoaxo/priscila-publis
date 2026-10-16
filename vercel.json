@@ -1,7 +1,10 @@
 {
   "outputDirectory": "public",
   "regions": ["gru1"],
-  "rewrites": [{ "source": "/portfolio", "destination": "/index.html" }],
+  "rewrites": [
+    { "source": "/portfolio", "destination": "/index.html" },
+    { "source": "/portfolio/:slug", "destination": "/index.html" }
+  ],
   "headers": [
     { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
     { "source": "/:arquivo(index.html|app.js|styles.css)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },

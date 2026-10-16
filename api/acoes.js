@@ -6,14 +6,14 @@ const STATUS_ENTREGA = { combinado: 'Combinado', produzindo: 'Produzindo', aprov
 const STATUS_TAREFA = ['pendente', 'fazendo', 'feita'];
 const brl = (n) => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export default rota(async ({ req, body }) => {
+export default rota(async ({ req, body, uid }) => {
   if (req.method !== 'POST') throw erro(405, 'Método não permitido.');
   const id = parseInt(body.id, 10);
   if (!id) throw erro(400, 'Item não informado.');
 
   if (body.acao === 'campanha_status') {
     if (!STATUS_CAMPANHA.includes(body.status)) throw erro(400, 'Status inválido.');
-    const r = await sql`UPDATE publis SET status = ${body.status}, atualizado_em = now() WHERE id = ${id} RETURNING id`;
+    const r = await sql`UPDATE publis SET status = ${body.status}, atualizado_em = now() WHERE id = ${id} AND usuario_id = ${uid} RETURNING id`;
     if (!r.length) throw erro(404, 'Campanha não encontrada.');
     await registrar(id, `Status alterado para "${STATUS_LABEL[body.status]}"`);
     return { ok: true };
@@ -22,7 +22,7 @@ export default rota(async ({ req, body }) => {
   if (body.acao === 'nota') {
     const t = texto(body.texto, 1000);
     if (!t) throw erro(400, 'Escreva a atualização.');
-    const [p] = await sql`SELECT id FROM publis WHERE id = ${id}`;
+    const [p] = await sql`SELECT id FROM publis WHERE id = ${id} AND usuario_id = ${uid}`;
     if (!p) throw erro(404, 'Campanha não encontrada.');
     await registrar(id, t, 'nota');
     return { ok: true };
@@ -30,7 +30,8 @@ export default rota(async ({ req, body }) => {
 
   if (body.acao === 'entrega_status') {
     if (!STATUS_ENTREGA[body.status]) throw erro(400, 'Status inválido.');
-    const [r] = await sql`UPDATE entregas SET status = ${body.status} WHERE id = ${id} RETURNING publi_id, rede, formato`;
+    const [r] = await sql`UPDATE entregas e SET status = ${body.status} FROM publis p
+      WHERE e.id = ${id} AND p.id = e.publi_id AND p.usuario_id = ${uid} RETURNING e.publi_id, e.rede, e.formato`;
     if (!r) throw erro(404, 'Entrega não encontrada.');
     await registrar(r.publi_id, `${r.rede} ${r.formato}: ${STATUS_ENTREGA[body.status]}`);
     return { ok: true };
@@ -38,7 +39,8 @@ export default rota(async ({ req, body }) => {
 
   if (body.acao === 'parcela_pago') {
     const pagoEm = body.pago ? (data(body.pago_em) || hojeJS()) : null;
-    const [r] = await sql`UPDATE parcelas SET pago_em = ${pagoEm} WHERE id = ${id} RETURNING publi_id, numero, valor`;
+    const [r] = await sql`UPDATE parcelas pa SET pago_em = ${pagoEm} FROM publis p
+      WHERE pa.id = ${id} AND p.id = pa.publi_id AND p.usuario_id = ${uid} RETURNING pa.publi_id, pa.numero, pa.valor`;
     if (!r) throw erro(404, 'Parcela não encontrada.');
     await registrar(r.publi_id, pagoEm ? `Parcela ${r.numero} recebida (${brl(r.valor)})` : `Recebimento da parcela ${r.numero} desfeito`);
     return { ok: true, pago_em: pagoEm };
@@ -46,7 +48,7 @@ export default rota(async ({ req, body }) => {
 
   if (body.acao === 'permuta_recebida') {
     const em = body.recebida ? (data(body.em) || hojeJS()) : null;
-    const r = await sql`UPDATE publis SET permuta_recebida_em = ${em} WHERE id = ${id} AND tipo_pagamento <> 'dinheiro' RETURNING id`;
+    const r = await sql`UPDATE publis SET permuta_recebida_em = ${em} WHERE id = ${id} AND usuario_id = ${uid} AND tipo_pagamento <> 'dinheiro' RETURNING id`;
     if (!r.length) throw erro(404, 'Permuta não encontrada.');
     await registrar(id, em ? 'Permuta recebida' : 'Recebimento da permuta desfeito');
     return { ok: true, em };
@@ -55,7 +57,7 @@ export default rota(async ({ req, body }) => {
   if (body.acao === 'tarefa_status') {
     if (!STATUS_TAREFA.includes(body.status)) throw erro(400, 'Status inválido.');
     const feita = body.status === 'feita' ? hojeJS() : null;
-    const [r] = await sql`UPDATE tarefas SET status = ${body.status}, concluida_em = ${feita} WHERE id = ${id} RETURNING publi_id, titulo`;
+    const [r] = await sql`UPDATE tarefas SET status = ${body.status}, concluida_em = ${feita} WHERE id = ${id} AND usuario_id = ${uid} RETURNING publi_id, titulo`;
     if (!r) throw erro(404, 'Tarefa não encontrada.');
     if (r.publi_id && feita) await registrar(r.publi_id, `Tarefa concluída: ${r.titulo}`);
     return { ok: true };

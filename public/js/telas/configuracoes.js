@@ -92,17 +92,19 @@ export async function telaPortfolioConfig() {
   try { d = await api('portfolio?editar=1'); } catch (e) { main.innerHTML = cabecalho({ titulo: 'Configurações' }) + abas('portfolio') + erroBloco(e.message); return; }
   const p = d.portfolio || {};
   const st = { metricas: [...(p.metricas || [])], trabalhos: [...(p.trabalhos || [])] };
-  const link = location.origin + '/portfolio';
+  const linkDe = (s) => location.origin + '/portfolio/' + (s || 'seu-nome');
+  let link = linkDe(d.slug || d.sugestao_slug);
 
   main.innerHTML = cabecalho({ titulo: 'Configurações' }) + abas('portfolio') + `
   <form id="form-port" class="form-col largura-form" novalidate>
     <section class="bloco">
       <label class="interruptor"><input type="checkbox" id="publicado" ${d.publicado ? 'checked' : ''}><span class="int-trilho" aria-hidden="true"></span>
         <span><b>Portfólio publicado</b><small>Quando ligado, qualquer pessoa com o link vê a página.</small></span></label>
+      <div class="campo"><label for="slug">Endereço do portfólio</label><input id="slug" value="${esc(d.slug || d.sugestao_slug || '')}" placeholder="seu-nome" maxlength="40" autocapitalize="off" spellcheck="false"></div>
       <div class="link-publico">
-        <code>${esc(link)}</code>
+        <code id="link-port">${esc(link)}</code>
         <button type="button" class="btn pequeno" data-copiar>Copiar link</button>
-        <a class="btn pequeno" href="/portfolio" target="_blank" rel="noopener">${icone('olho', 16)}Ver página</a>
+        <a class="btn pequeno" id="ver-port" href="${esc(link)}" target="_blank" rel="noopener">${icone('olho', 16)}Ver página</a>
       </div>
       <div class="aviso-privado">${icone('olho', 18)}<p>Só aparece o que você preencher abaixo, mais sua foto, nome e redes. <b>Nunca aparecem</b> valores, briefings, notas privadas, contatos das marcas ou dados das campanhas.</p></div>
     </section>
@@ -168,6 +170,12 @@ export async function telaPortfolioConfig() {
   $('#metricas').addEventListener('click', (e) => { const b = e.target.closest('[data-rm-met]'); if (b) { st.metricas.splice(+b.dataset.rmMet, 1); rMet(); } });
   $('#trabalhos').addEventListener('input', (e) => { const k = e.target.dataset.tk, r = e.target.closest('[data-ti]'); if (k && r) st.trabalhos[+r.dataset.ti][k] = e.target.value; });
   $('#trabalhos').addEventListener('click', (e) => { const b = e.target.closest('[data-rm-trab]'); if (b) { st.trabalhos.splice(+b.dataset.rmTrab, 1); rTrab(); } });
+  $('#slug').addEventListener('input', () => {
+    const s = $('#slug').value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '');
+    link = linkDe(s.replace(/-+$/, ''));
+    $('#link-port').textContent = link;
+    $('#ver-port').href = link;
+  });
   $('[data-copiar]').onclick = async () => {
     try { await navigator.clipboard.writeText(link); toast('Link copiado.'); } catch { toast('Não deu para copiar. Selecione o link e copie.', 'erro'); }
   };
@@ -177,7 +185,7 @@ export async function telaPortfolioConfig() {
     btn.disabled = true;
     try {
       await api('portfolio', { method: 'PUT', body: {
-        publicado: $('#publicado').checked, bio: $('#bio').value, nichos: $('#nichos').value,
+        publicado: $('#publicado').checked, slug: $('#slug').value, bio: $('#bio').value, nichos: $('#nichos').value,
         marcas: [...main.querySelectorAll('input[name=marca]:checked')].map((c) => c.value),
         portfolio: {
           titulo: $('#titulo').value, cidade: $('#cidade').value,

@@ -1,11 +1,11 @@
 import { api, esc, icone, avatar } from '../core.js';
 
-export async function telaPortfolioPublico() {
+export async function telaPortfolioPublico(slug = '') {
   const app = document.getElementById('app');
   document.body.classList.add('pagina-publica');
   app.innerHTML = '<div class="carregando" role="status"><span class="spinner" aria-hidden="true"></span>Carregando…</div>';
   let p;
-  try { p = await api('portfolio', { semRedirecionar: true }); }
+  try { p = await api(slug ? 'portfolio?u=' + encodeURIComponent(slug) : 'portfolio', { semRedirecionar: true }); }
   catch (e) {
     app.innerHTML = `<main class="port-indisponivel"><h1>Portfólio indisponível</h1><p>${esc(e.message)}</p></main>`;
     return;
